@@ -1,0 +1,1 @@
+Added front_remaining_final assets, schema helper, /notifications page, /api/favorites/add_notify endpoint, and inserted remaining qty in templates where pattern matched. No removals.
