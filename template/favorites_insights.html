@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}喜好洞察{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3>喜愛洞察</h3>
+  <a href="/dashboard" class="btn btn-outline-primary btn-sm">打開完整儀表板</a>
+</div>
+
+<div class="row g-4">
+  <!-- Top 類別 -->
+  <div class="col-md-6 col-lg-4">
+    <div class="card">
+      <div class="card-header">Top 類別</div>
+      <div class="card-body" style="height:250px">
+        <canvas id="catChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- 品牌分布 -->
+  <div class="col-md-6 col-lg-4">
+    <div class="card">
+      <div class="card-header">品牌分布</div>
+      <div class="card-body" style="height:250px">
+        <canvas id="brandChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top 門市 -->
+  <div class="col-md-6 col-lg-4">
+    <div class="card">
+      <div class="card-header">Top 門市</div>
+      <div class="card-body" style="height:250px">
+        <canvas id="storeChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- 時間趨勢 -->
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">喜愛時間趨勢</div>
+      <div class="card-body" style="height:300px">
+        <canvas id="timeChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- 評分 vs 喜愛 -->
+  <div class="col-md-6 col-lg-4">
+    <div class="card text-center">
+      <div class="card-header">評分 vs 喜愛</div>
+      <div class="card-body" style="height:250px">
+        <h4 id="ratingAvg">--</h4>
+        <p class="text-muted">平均評分</p>
+        <h4 id="favCount">--</h4>
+        <p class="text-muted">總喜愛數</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+async function loadInsights(){
+  const res = await fetch("/api/fav_stats");
+  if(!res.ok) return;
+  const data = await res.json();
+
+  // Top 類別
+  new Chart(document.getElementById("catChart"), {
+    type: "bar",
+    data: {
+      labels: data.top_categories.map(x=>x.category||"未分類"),
+      datasets: [{label:"喜愛數", data: data.top_categories.map(x=>x.count), backgroundColor:"#4e79a7"}]
+    },
+    options:{responsive:true,plugins:{legend:{display:false}}}
+  });
+
+  // 品牌分布
+  new Chart(document.getElementById("brandChart"), {
+    type: "pie",
+    data: {
+      labels: data.brand_dist.map(x=>x.brand||"其他"),
+      datasets: [{data: data.brand_dist.map(x=>x.count),
+                  backgroundColor:["#4e79a7","#f28e2b","#e15759","#76b7b2","#59a14f","#edc949"]}]
+    }
+  });
+
+  // 時間序列
+  new Chart(document.getElementById("timeChart"), {
+    type: "line",
+    data: {
+      labels: data.timeline.map(x=>x.day),
+      datasets: [{label:"新增喜愛數", data: data.timeline.map(x=>x.count), borderColor:"#e15759", fill:false}]
+    },
+    options:{scales:{y:{beginAtZero:true}}}
+  });
+
+  // Top 門市
+  new Chart(document.getElementById("storeChart"), {
+    type: "bar",
+    data: {
+      labels: data.top_stores.map(x=>x.store_name+" ("+(x.brand||"")+")"),
+      datasets: [{label:"喜愛數", data: data.top_stores.map(x=>x.count), backgroundColor:"#59a14f"}]
+    },
+    options:{indexAxis:"y",plugins:{legend:{display:false}}}
+  });
+
+  // 評分 vs 喜愛
+  if(data.rating_vs){
+    document.getElementById("ratingAvg").textContent = data.rating_vs.avg_rating || "--";
+    document.getElementById("favCount").textContent = data.rating_vs.fav_count || "--";
+  }
+}
+
+window.addEventListener("DOMContentLoaded", loadInsights);
+</script>
+{% endblock %}

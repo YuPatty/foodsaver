@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+{% block title %}我的喜愛{% endblock %}
+{% block content %}
+<h3 class="mb-3">我的喜愛</h3>
+<div id="favList" class="row g-3"></div>
+
+<hr class="my-4">
+<div class="d-flex align-items-center justify-content-between">
+    <h4 class="mb-0">其他人也喜歡</h4>
+</div>
+<div id="recommendations-container" class="row mt-3 g-3"></div>
+
+<hr class="my-4">
+<div class="d-flex align-items-center justify-content-between">
+  <h4 class="mb-0">喜愛洞察</h4>
+  <a class="btn btn-outline-primary btn-sm" href="{{ url_for('favorites_insights') }}">打開完整儀表板</a>
+</div>
+<canvas id="favMiniChart" height="120" class="mt-3"></canvas>
+
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// --- 小工具 (從 recommend.html 複製過來，確保評價星級顯示正常) ---
+function starText(avg){ const a=Math.floor(+avg||0); return "★".repeat(a)+"☆".repeat(5-a); }
+
+// *** 必須加入此函式，否則「加入喜愛」按鈕會出錯 ***
+async function addFav(pid){
+  const fd = new FormData(); fd.append('product_id', pid);
+  const r = await fetch('/api/favorites/add', {method:'POST', body: fd});
+  if (r.ok) {
+    loadFavorites();
+    fetchAndDisplayRecommendations();
+    // 假設您有一個 toast 函式來顯示成功通知
+    toast('已加入喜愛', 'success');
+    alert('已加入喜愛！');
+    location.reload();
+  } else {
+    toast('加入失敗，請稍後再試', 'danger');
+    //alert('加入失敗，請稍後再試');
+  }
+
+  
+}
+
+async function loadFavorites(){
+  const res = await fetch("{{ url_for('api_favorites') }}"); const items = await res.json();
+  const wrap = document.getElementById('favList'); wrap.innerHTML='';
+  if(!items.length){ wrap.innerHTML = '<div class="text-muted">目前沒有任何喜愛</div>'; return; }
+
+  items.forEach(i=>{
+    // 根據預測時間，決定顯示的文字和樣式
+    let forecastText;
+    let forecastClass;
+    let sellOutHours = i.sell_out_time;
+
+    if (sellOutHours === -1) {
+        // -1: 商品不存在或無法預測 (來自 _forecast_stock)
+        forecastText = '銷售資料不足，無法預測';
+        forecastClass = 'text-muted';
+    } else if (sellOutHours < 0) {
+        // 負數: 庫存為 0，且 sellOutHours 是距離下次進貨的時間 (小時)
+        const timeToRestockMinutes = Math.ceil(-sellOutHours * 60);
+        
+        if (timeToRestockMinutes <= 60) {
+            // 一小時內進貨 (分鐘)
+            forecastText = `<b>再過 ${timeToRestockMinutes} 分鐘就進貨！</b>`;
+            forecastClass = 'text-danger fw-bold';
+        } else {
+            // 超過一小時 (小時)
+            forecastText = `<b>再過 ${Math.ceil(-sellOutHours)} 小時就進貨！</b>`;
+            forecastClass = 'text-danger fw-bold';
+        }
+    } else if (sellOutHours === 0) {
+        // 0: 庫存為 0，但後端沒有提供下次進貨時間（理論上不發生，但作防禦性處理）
+        forecastText = '已售罄';
+        forecastClass = 'text-danger';
+    } else if (sellOutHours < 1) {
+        // 1 小時內售罄 (分數，取整數，紅色粗體)
+        forecastText = `<b>預計 ${Math.ceil(sellOutHours * 60)} 分鐘內賣完！</b>`;
+        forecastClass = 'text-danger fw-bold'; // 使用 fw-bold
+    } else if (sellOutHours < 24) {
+        // 1 到 24 小時內售罄 (小時)
+        forecastText = `預計 ${sellOutHours} 小時內賣完！`;
+        forecastClass = 'text-danger';
+    } else {
+        // 24 小時以上或充足
+        forecastText = '庫存充足';
+        forecastClass = 'text-success';
+    }
+
+    // --- 星級顯示修正處：如果沒有評分，顯示 5 顆空星 ---
+    // 確保即使 avg_rating 是 null, 0, 或 undefined 也能正確顯示空星
+    const ratingValue = i.avg_rating || 0; // 如果沒有評分，使用 0 
+    const starRatingHtml = `<span class="text-warning me-1">${starText(ratingValue)}</span>`; 
+
+    // 價格和折扣顯示
+    const now = (i.final_price ?? i.price ?? 0).toFixed(0);
+    const old = (i.price ?? 0).toFixed(0);
+    const hasDisc = i.discount_rate && i.discount_rate < 1.0;
+
+    const priceHtml = `
+      <div class="mt-1 mb-2">
+        <span class="fw-bold text-danger">NT$${now}</span>
+        ${hasDisc?`<span class="text-muted text-decoration-line-through ms-2">$${old}</span>`:''}
+      </div>
+      `;
+    // --- 修正結束 ---
+
+    const col = document.createElement('div'); col.className='col-md-4';
+    col.innerHTML = `
+      <div class="card h-100">
+        <img class="card-img-top" src="${i.image_url||''}" alt="${i.name||''}">
+        <div class="card-body d-flex flex-column">
+          <h6 class="card-title">${i.name||''}</h6>
+          <div class="small text-muted">${i.store_name||''} · ${i.brand||''}</div>
+          <div class="small text-muted">${i.address||''}</div>
+          <span class="small text-muted ms-1">${starRatingHtml} ${ratingValue.toFixed(1)}/5</span>
+          ${priceHtml}
+          <div class="small text-success fw-bold">剩餘 ${i.remaining_qty ?? 0} 件</div>
+
+          <div class="mt-auto d-flex gap-2">
+            <a class="btn btn-outline-secondary btn-sm w-50" href="/product/${i.product_id}">評價</a>
+            <button class="btn btn-outline-danger btn-sm w-50" onclick="removeFav(${i.product_id})">移除</button>
+          </div>
+        </div>
+      </div>`;
+    wrap.appendChild(col);
+
+    fetchForecast(i.id);
+  });
+}
+
+async function removeFav(pid){
+  const fd = new FormData(); fd.append('product_id', pid);
+  await fetch("{{ url_for('api_favorites_remove') }}", {method:'POST', body: fd});
+  loadFavorites(); loadMiniChart(); fetchAndDisplayRecommendations();
+}
+
+async function loadMiniChart(){
+  const res = await fetch("{{ url_for('api_fav_stats') }}"); const stats = await res.json();
+  const ctx = document.getElementById('favMiniChart').getContext('2d');
+  if(window._mini){ window._mini.destroy(); }
+  window._mini = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: stats.top_categories.map(x=>x.category),
+      datasets: [{ label:'各類別喜愛數', data: stats.top_categories.map(x=>x.count) }]
+    },
+    options: { responsive:true, plugins:{ legend:{display:false} } }
+  });
+}
+
+async function fetchAndDisplayRecommendations() {
+    fetch('{{ url_for("api_item_recommend") }}')
+        .then(response => response.json())
+        .then(data => {
+            const container = document.getElementById('recommendations-container');
+            container.innerHTML = ''; // 清空舊內容
+            if (data.recommendations && data.recommendations.length > 0) {
+                data.recommendations.forEach(p => { 
+                    
+                    // --- 推薦卡片邏輯 ---
+                    const now = (p.final_price ?? p.price ?? 0).toFixed(0);
+                    const old = (p.price ?? 0).toFixed(0);
+                    const hasDisc = p.discount_rate && p.discount_rate < 1.0; 
+                    
+                    // 價格和折扣顯示
+                    const priceHtml = `
+                        <div class="mt-1 mb-2">
+                          <span class="fw-bold text-danger">NT$${now}</span>
+                          ${hasDisc?`<span class="text-muted text-decoration-line-through ms-2">$${old}</span>`:''}
+                        </div>
+                    `;
+
+                    // 評分顯示
+                    const ratingValue = p.avg_rating || 0; // 沒有評分則顯示 0 顆星
+                    const ratingHtml = `<span class="text-warning small mb-1">${starText(ratingValue)}</span>`;
+                    
+                    // 推薦原因處理 (外觀調整)
+                    let reasonsHtml = '';
+                    if (p.reasons && p.reasons.length > 0) {
+                        const reasonsText = p.reasons.map(reason => {
+                            return `「${reason.source_product_name}」`;
+                        }).join('、');
+                        
+                        // **** 推薦原因外觀調整處 ****
+                        reasonsHtml = `<p class="card-text small border-start border-3 border-info ps-2 mb-3 mt-2" style="line-height: 1.4;">
+                                        <span class="fw-bold text-info">因為你收藏了 ${reasonsText}</span>
+                                      </p>`;
+                        // *****************************
+                    }
+                    
+                    // 創建商品卡片元素
+                    const productCard = `
+                        <div class="col-6 col-md-4 col-lg-3 mb-4">
+                            <div class="card h-100 product-card">
+                                <a href="/product/${p.id}" class="card-link text-decoration-none text-dark">
+                                    <img src="${p.image_url||''}" class="card-img-top" alt="${p.name||''}" loading="lazy">
+                                </a>
+                                <div class="card-body d-flex flex-column">
+                                    <a href="/product/${p.id}" class="text-decoration-none text-dark">
+                                        <div class="fw-semibold text-truncate">${p.name||''}</div>
+                                        <div class="small text-muted text-truncate">${p.store_name||''}</div>
+                                        <span class="small text-muted ms-1">${ratingHtml}  ${ratingValue.toFixed(1)}/5</span>
+                                        ${priceHtml}
+                                    </a>
+
+                                    ${reasonsHtml}
+                                    
+                                    <div class="mt-auto d-flex gap-2">
+                                      <a class="btn btn-outline-secondary btn-sm w-50" href="/product/${p.id}">詳情/評價</a>
+                                      <button class="btn btn-primary btn-sm w-50" onclick="addFav(${p.id})">加入喜愛</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    container.innerHTML += productCard;
+                });
+            } else {
+                container.innerHTML = '<p class="text-center text-muted">目前沒有推薦商品。</p>';
+            }
+        })
+        .catch(error => console.error('Error fetching recommendations:', error));
+}
+
+window.addEventListener('DOMContentLoaded', ()=>{ 
+    // 確保 addFav 函式已經存在，以便按鈕點擊時不會出錯
+    if (typeof addFav !== 'function') {
+        console.error("Warning: addFav function is missing! The '加入喜愛' button will not work.");
+    }
+
+    loadFavorites(); 
+    loadMiniChart(); 
+    fetchAndDisplayRecommendations();
+});
+
+// *** 新增函式：負責呼叫預測 API 並更新 UI ***
+async function fetchForecast(pid) {
+    const forecastElement = document.getElementById(`forecast-${pid}`);
+    if (!forecastElement){
+        console.warn(`Forecast element not found for PID: ${pid}`);
+        return;
+    }
+
+    try {
+        // 【連線關鍵】: 移除斜線，使用相對路徑來連線到 app.py 的 @app.route("/api/forecast/<int:pid>")
+        const response = await fetch(`api/forecast/${pid}`); 
+        const data = await response.json();
+
+        if (data.ok && data.sell_out_time_hours !== undefined) {
+            const sellOutHours = data.sell_out_time_hours;
+            
+            let statusText = '';
+            let statusClass = 'text-success';
+
+            if (sellOutHours < 0) {
+                // 庫存為 0，即將進貨 (負數)
+                statusClass = 'text-danger';
+                const restockHoursAbs = Math.abs(sellOutHours); // 【修正點 1】: 確保只對正數取 toFixed
+                const restockMinutes = restockHoursAbs * 60; 
+                
+                if (restockMinutes < 60) {
+                    statusText = `已售罄！再過 ${Math.round(restockMinutes)} 分鐘將進貨！`;
+                } else {
+                    // 使用 restockHoursAbs 確保我們是對正數取小數點
+                    statusText = `已售罄！再過 ${restockHoursAbs.toFixed(1)} 小時將進貨！`;
+                }
+            } else if (sellOutHours > 0 && sellOutHours < 24) {
+                // 24 小時內售罄
+                statusClass = 'text-warning';
+                statusText = `❗ 預計 ${sellOutHours.toFixed(1)} 小時內售罄`;
+            } else if (sellOutHours >= 24) {
+                // 庫存充足
+                statusClass = 'text-success';
+                statusText = '✅ 庫存充足';
+            } else if (sellOutHours === 0) {
+                // 庫存為 0 (如果後端沒有計算補貨時間)
+                statusClass = 'text-danger';
+                statusText = '❌ 庫存已售罄';
+            } else { // sellOutHours == -1 或其他錯誤值
+                statusClass = 'text-secondary';
+                statusText = '無法預測';
+            }
+
+            // 【修正點 2】：確保 className 和 innerText 都是正確的
+            forecastElement.className = `small fw-bold mt-1 ${statusClass}`;
+            forecastElement.innerText = statusText;
+
+
+        } else {
+            forecastElement.innerText = data.message || '預測失敗';
+            forecastElement.classList.add('text-muted');
+        }
+    } catch (error) {
+        console.error(`Error fetching forecast for product ${pid}:`, error);
+        forecastElement.innerText = '載入預測失敗';
+        forecastElement.classList.add('text-muted');
+    }
+}
+</script>
+{% endblock %}

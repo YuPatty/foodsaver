@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}註冊{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="card p-4">
+      <h3 class="mb-3">註冊</h3>
+      <form method="post">
+        <div class="mb-3">
+          <label class="form-label">用戶名</label>
+          <input name="username" class="form-control" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Email</label>
+          <input name="email" type="email" class="form-control" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">密碼</label>
+          <input name="password" type="password" class="form-control" required minlength="6">
+        </div>
+        <button class="btn btn-primary w-100">建立帳號</button>
+      </form>
+      <div class="text-center mt-3">
+        已有帳號？ <a href="{{ url_for('index') }}">登入</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

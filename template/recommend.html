@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+{% block title %}推薦商品{% endblock %}
+
+<style>
+/* 熱門商品按鈕 hover 效果 */
+#popularProducts button:hover {
+    background-color: #0d6efd;  /* Bootstrap primary 藍 */
+    color: #fff;                /* 文字改白色 */
+    border-color: #0d6efd;      /* 邊框同樣變藍 */
+    transition: all 0.2s ease;
+}
+</style>
+
+{% block content %}
+{{ super() }}
+
+<script>
+  /* 從後端注入是否登入（以字串比較避免未定義造成語法錯誤） */
+  const IS_AUTH = "{{ 'true' if current_user else 'false' }}" === "true";
+</script>
+
+<!-- 搜尋條 -->
+<div class="card mb-3" id="search">
+  <div class="card-body">
+    <form id="searchForm" class="row g-2 align-items-end">
+      <div class="col-12 col-md-4">
+        <label class="form-label">商品名稱</label>
+        <input type="text" class="form-control" id="qInput" placeholder="輸入關鍵字，如：牛奶">
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label">類別</label>
+        <select class="form-select" id="catSelect">
+          <option value="">全部類別</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label">最低價</label>
+        <input type="number" class="form-control" id="minPrice" min="0" step="1" placeholder="0">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label">最高價</label>
+        <input type="number" class="form-control" id="maxPrice" min="0" step="1" placeholder="999">
+      </div>
+      <div class="col-6 col-md-1 d-grid">
+        <button class="btn btn-primary" type="submit">搜尋</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!--猜你想搜-->
+<div id="popularProductsContainer" class="mt-3" style="display: none;">
+  猜你想搜  <div id="popularProducts" class="d-inline-block"></div>
+</div>
+
+<!--排序選擇-->
+<div id="sortContainer" class="d-none"></div>
+
+<!-- 搜尋結果 -->
+<div id="searchResults" class="row g-3"></div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+/* 小工具 */
+function starText(avg){ const a=Math.floor(+avg||0); return "★".repeat(a)+"☆".repeat(5-a); }
+
+/* 單張卡片 HTML（含登入/未登入兩種版型） */
+function card(p){
+  const now = (p.final_price ?? p.price ?? 0).toFixed(0);
+  const old = (p.price ?? 0).toFixed(0);
+  const hasDisc = p.discount_rate && p.discount_rate < 1.0;
+
+  // 檢查是否有距離資訊
+  const distText = p.distance_km ? ` · ${p.distance_km} km` : '';
+  const remainingText = p.remaining_qty ? `剩餘 ${p.remaining_qty} 件` : '已售完';
+
+
+  /* 導航改用地址關鍵字，避免必須經緯度 */
+  // 走你後端受保護路由，由後端決定是否要登入 & 導轉到 Google
+  const navUrl = `/go/store/${p.store_id}`;
+
+  /* 兩種按鈕群：
+     - 未登入：上排 2 個（各 50%）：詳情/評價 + 導航至商店
+     - 已登入：上排 2 個（各 50%）：詳情/評價 + 加入喜愛；下排 1 個（100%）：導航至商店
+  */
+  const whenAuthed = `
+    <div class="d-flex gap-2 mb-2">
+      <a class="btn btn-outline-secondary btn-sm w-50" href="/product/${p.id}">詳情/評價</a>
+      <button class="btn btn-primary btn-sm w-50" onclick="addFavWithConfirm(${p.id})">加入喜愛</button>
+    </div>
+    <a class="btn btn-outline-dark btn-sm w-100" target="_blank" rel="noopener" href="${navUrl}">導航至商店</a>
+  `;
+
+  const whenGuest = `
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary btn-sm w-50" href="/product/${p.id}">詳情/評價</a>
+      <a class="btn btn-outline-dark btn-sm w-50" target="_blank" rel="noopener" href="${navUrl}">導航至商店</a>
+    </div>
+  `;
+
+  return `
+  <div class="col-12 col-md-6 col-xl-3">
+    <div class="card h-100 position-relative">
+      <img src="${p.image_url||''}" class="card-img-top" alt="${p.name||''}" loading="lazy">
+      <div class="card-body d-flex flex-column">
+        <div class="fw-semibold text-truncate">${p.name||''}</div>
+        <div class="small text-muted text-truncate">${p.store_name||''}${p.brand?` · ${p.brand}`:''}${distText}</div>
+        <div class="small text-success fw-bold">${remainingText}</div>
+        <div class="text-warning small mb-1">${starText(p.avg_rating)}</div>
+        <div class="mt-1 mb-2">
+          <span class="fw-bold text-danger">$${now}</span>
+          ${hasDisc?`<span class="text-muted text-decoration-line-through ms-2">$${old}</span>`:''}
+        </div>
+        <div class="mt-auto">
+          ${IS_AUTH ? whenAuthed : whenGuest}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* 載入類別下拉（若後端沒這個 API，可先忽略） */
+async function loadCategories(){
+  try{
+    const res = await fetch('/api/categories');
+    if(!res.ok) return;
+    const cats = await res.json();
+    const sel  = document.getElementById('catSelect');
+    cats.forEach(c => {
+      const o=document.createElement('option');
+      o.value=c; o.textContent=c;
+      sel.appendChild(o);
+    });
+  }catch(e){ console.error(e); }
+}
+
+// 創建排序選單的 HTML 程式碼
+function createSortSelectHtml() {
+  return `
+    <div class="row align-items-center mb-3">
+      <div class="col-auto">
+        <label class="form-label mb-0">排序：</label>
+      </div>
+      <div class="col-auto">
+        <select class="form-select form-select-sm" id="sortSelect">
+          <option value="">綜合排序</option>
+          <option value="price_asc">價格：由低到高</option>
+          <option value="rating_desc">評價：由高到低</option>
+          <option value="remain_qty">剩餘數量：由多到少</option>
+          <option value="distance">距離：由近到遠</option>
+        </select>
+      </div>
+    </div>
+  `;
+}
+
+// 送出搜尋
+// `sortValue` 參數用於儲存排序方式，預設為空
+async function doSearch(e, sortValue = null) {
+  // 阻止表單預設的整頁刷新行為，但允許在非表單提交時呼叫
+  if (e) e.preventDefault();
+  
+  // 取得使用者輸入的搜尋條件
+  const q = document.getElementById('qInput').value.trim();
+  const category = document.getElementById('catSelect').value;
+  const minp = document.getElementById('minPrice').value;
+  const maxp = document.getElementById('maxPrice').value;
+
+  // 獲取使用者當前位置（經緯度）
+  let user_lat = null;
+  let user_lng = null;
+  
+  if (navigator.geolocation) {
+    try {
+      // 使用 Promise 來等待位置資訊，並設定超時
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
+      });
+      user_lat = position.coords.latitude;
+      user_lng = position.coords.longitude;
+    } catch (error) {
+      console.error("無法取得使用者位置：", error);
+    }
+  }
+
+  // 建立查詢字串
+  const qs = new URLSearchParams();
+  if (q) qs.set('q', q);
+  if (category) qs.set('category', category);
+  if (minp) qs.set('min_price', minp);
+  if (maxp) qs.set('max_price', maxp);
+  if (sortValue) qs.set('sort', sortValue); // 將排序參數加入到查詢字串中
+  if (user_lat) qs.set('lat', user_lat);
+  if (user_lng) qs.set('lng', user_lng);
+
+  // 發送 API 請求
+  const res = await fetch(`/api/products/search?${qs.toString()}`);
+  const items = res.ok ? await res.json() : [];
+
+  const sortContainer = document.getElementById('sortContainer');
+  const resultsBox = document.getElementById('searchResults');
+
+  // 如果有搜尋結果
+  if (items.length > 0) {
+    // 只有在初次搜尋時（沒有 sortValue）才動態建立排序選單並綁定事件
+    if (!sortValue) {
+      sortContainer.innerHTML = createSortSelectHtml();
+      sortContainer.classList.remove('d-none');
+      
+      // 為新生成的排序選單綁定 'change' 事件
+      document.getElementById('sortSelect').addEventListener('change', (event) => {
+        // 當排序選項改變時，重新呼叫 doSearch，並帶上新的排序值
+        doSearch(null, event.target.value);
+      });
+    }
+
+    // 顯示商品卡片
+    resultsBox.innerHTML = items.map(card).join('');
+  } else {
+    // 如果沒有搜尋結果，則隱藏排序選單
+    sortContainer.innerHTML = '';
+    sortContainer.classList.add('d-none');
+    resultsBox.innerHTML = `<div class="col-12 text-muted">找不到符合條件的商品</div>`;
+  }
+}
+
+// 初始化
+window.addEventListener('DOMContentLoaded', ()=>{
+  loadCategories();
+  document.getElementById('searchForm').addEventListener('submit', doSearch);
+  /* 預設載入一次（可選） */
+  doSearch();
+});
+
+/* 加入喜愛 */
+async function addFav(pid){
+  const fd = new FormData(); fd.append('product_id', pid);
+  const r = await fetch('/api/favorites/add', {method:'POST', body: fd});
+  if (r.ok) {
+    toast('已加入喜愛', 'success');        // ← 好看的通知
+  } else {
+    toast('加入失敗，請稍後再試', 'danger'); // ← 失敗樣式
+  }
+}
+async function addFavWithConfirm(pid){
+  if (await confirmBox('加入喜愛', '確定要加入喜愛嗎？', '加入', '取消')) {
+    await addFav(pid);
+  }
+}
+
+/* 初始化 */
+window.addEventListener('DOMContentLoaded', ()=>{
+  loadCategories();
+  document.getElementById('searchForm').addEventListener('submit', doSearch);
+  /* 預設載入一次（可選） */
+  doSearch();
+});
+
+/* 載入猜你想搜商品並顯示 */
+async function loadPopularProducts() {
+  if (!IS_AUTH) return; // 未登入則不顯示
+  
+  const container = document.getElementById('popularProductsContainer');
+  const productsBox = document.getElementById('popularProducts');
+
+  try {
+    const res = await fetch('/api/popular_products'); // ✅ 新的 API
+    const products = res.ok ? await res.json() : [];
+
+    if (products.length > 0) {
+      container.style.display = 'block';
+      container.classList.add('mb-3');  
+      
+      const html = products.map(name => `
+        <button type="button"
+          class="btn btn-outline-secondary btn-sm rounded-pill me-2"
+          onclick="handleProductClick('${name}')">
+          ${name}
+        </button>
+      `).join('');
+      
+      productsBox.innerHTML = html;
+    } else {
+      container.style.display = 'none';
+    }
+  } catch(e) {
+    console.error('無法載入熱門商品', e);
+    container.style.display = 'none';
+  }
+}
+
+/* 點擊猜你想搜 → 放進搜尋框並搜尋 */
+function handleProductClick(name) {
+  document.getElementById('qInput').value = name; // ✅ 放進名稱搜尋欄
+  doSearch(); // 觸發搜尋
+}
+
+// 修改DOMContentLoaded事件，在載入時呼叫新函式
+window.addEventListener('DOMContentLoaded', ()=>{
+  loadCategories();
+  document.getElementById('searchForm').addEventListener('submit', doSearch);
+  
+  // 呼叫新函式來載入想搜類別
+  loadPopularProducts(); 
+  
+  doSearch(); // 預設載入一次
+});
+</script>
+{% endblock %}

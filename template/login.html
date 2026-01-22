@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}登入{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="card p-4">
+      <h3 class="mb-3">登入</h3>
+      <form method="post">
+        <div class="mb-3">
+          <label class="form-label">帳號</label>
+          <input name="username" class="form-control" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">密碼</label>
+          <input name="password" type="password" class="form-control" required>
+        </div>
+        <button class="btn btn-primary w-100">登入</button>
+      </form>
+      <div class="text-center mt-3">
+        還沒有帳戶？ <a href="{{ url_for('register') }}">註冊</a><br>
+        測試帳號：demo / demo1234
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

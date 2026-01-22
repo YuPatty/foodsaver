@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}喜好項目{% endblock %}
+{% block content %}
+
+<style>
+/* 版面：左側 260px 側邊欄 + 右側主要內容 */
+.fav-shell { display: grid; grid-template-columns: 260px 1fr; gap: 24px; min-height: calc(100vh - 40px); }
+
+/* 側邊欄 */
+.fav-side { background: #eee7dc; border-radius: 12px; padding: 20px; color: #6b4f2a; }
+.fav-user { display:flex; align-items:center; gap:10px; font-weight:600; margin-bottom: 22px; }
+.fav-menu { list-style: disc; padding-left: 22px; margin: 0; }
+.fav-menu li { margin: 12px 0; }
+.fav-menu a { color: #6b4f2a; text-decoration: none; }
+.fav-menu .is-active > a { text-decoration: underline; font-weight: 700; }
+
+/* 右側區域 */
+.fav-main { background: #ffffff; border-radius: 12px; padding: 24px; }
+.fav-title { font-size: clamp(32px, 6vw, 72px); color: #6b4f2a; font-weight: 800; letter-spacing: 4px; margin: 6px 0 24px; border-bottom: 4px solid #6b4f2a; padding-bottom: 6px; }
+
+/* 表格樣式 */
+.fav-card { background:#fff; border:1px solid #e6e6e6; border-radius:12px; padding: 0; overflow:hidden; }
+.fav-table { width:100%; border-collapse: collapse; }
+.fav-table th, .fav-table td { padding: 12px 16px; border-bottom: 1px solid #eee; vertical-align: middle; }
+.fav-table th { background:#faf7f2; color:#6b4f2a; font-weight:700; }
+.fav-table tr:last-child td { border-bottom:none; }
+
+/* 刪除/移除按鈕 */
+.btn-outline-danger { border:1px solid #e3b1b1; color:#a45050; background:#fff; padding:6px 10px; border-radius:8px; }
+.btn-outline-danger:hover { background:#fde9e9; }
+
+/* 右下角總計 */
+.fav-total { text-align: right; margin-top: 10px; color:#6b4f2a; font-weight:700; }
+
+/* 空清單提示 */
+.fav-empty { margin-top: 12px; }
+</style>
+
+<div class="fav-shell">
+  <!-- 側邊欄 -->
+  <aside class="fav-side">
+    <div class="fav-user">{{ current_user.name if current_user is defined and current_user else '訪客 / 會員' }}</div>
+    <ul class="fav-menu">
+      <li class="{{ 'is-active' if request.path.startswith('/home') else '' }}">
+        <a href="/home">FoodMap</a>
+      </li>
+      <li class="{{ 'is-active' if request.path.startswith('/home') else '' }}">
+        <a href="/home">即食品地圖</a>
+      </li>
+      <li class="{{ 'is-active' if request.path.startswith('/recommend') else '' }}">
+        <a href="/recommend">推薦商品</a>
+      </li>
+      <li class="{{ 'is-active' if request.path.startswith('/cart') else '' }}">
+        <a href="/cart">喜好項目</a>
+      </li>
+      <li class="{{ 'is-active' if request.path.startswith('/notifications') else '' }}">
+        <a href="/notifications">通知</a>
+      </li>
+    </ul>
+  </aside>
+
+
+  <!-- 右側內容 -->
+  <main class="fav-main">
+    <h1 class="fav-title">FoodMap</h1>
+
+    {% if items and items|length > 0 %}
+      {% set totals = namespace(value=0) %}
+      <div class="fav-card">
+        <table class="fav-table" id="fav-table">
+          <thead>
+            <tr>
+              <th style="width:28%;">店家</th>
+              <th>品名</th>
+              <th style="width:12%;">單價</th>
+              <th style="width:12%;">數量</th>
+              <th style="width:12%;">小計</th>
+              <th style="width:10%;"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for it in items %}
+              {% set unit = (it.final_price if it.final_price is not none else it.price) | float %}
+              {% set qty  = (it.qty if it.qty is not none else 1) | int %}
+              {% set totals.value = totals.value + (unit * qty) %}
+
+              <tr>
+                <td>{{ it.store_name }}</td>
+                <td>
+                  {{ it.name }}
+                  <span class="text-warning">
+                    {% for i in range((it.avg_rating or 0)|int) %}★{% endfor %}
+                    {% for i in range(5-((it.avg_rating or 0)|int)) %}☆{% endfor %}
+                  </span>
+                  {% if it.discount_rate and it.discount_rate < 1 %}
+                    <span class="badge bg-danger ms-1">{{ (it.discount_rate*10)|round(1) }} 折</span>
+                  {% endif %}
+                </td>
+                <td>${{ unit }}</td>
+                <td>{{ it.qty if it.qty is not none else 1 }}</td>
+                <td>${{ (unit * (it.qty if it.qty is not none else 1))|round(2) }}</td>
+                <td><button class="btn btn-sm btn-outline-danger" onclick="removeItem({{ it.cart_item_id }})">刪除</button></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="fav-total" id="fav-total">總計：${{ totals.value|round(2) }}</div>
+
+      {% if any_discount %}
+      <div class="alert alert-success mt-3">🎉 你的喜好項目內有折扣商品！</div>
+      {% endif %}
+
+    {% else %}
+      <div class="alert alert-info fav-empty">喜好項目是空的。</div>
+    {% endif %}
+  </main>
+</div>
+
+<script>
+  // 從原 cart.html 搬回來：刪除收藏/項目後端 API
+  async function removeItem(id){
+    const form = new FormData();
+    form.append("cart_item_id", id);
+    try{
+      const r = await fetch("{{ url_for('api_remove_item') }}", { method:"POST", body: form });
+      const j = await r.json();
+      if(j.ok){ location.reload(); }
+      else { alert("刪除失敗"); }
+    }catch(e){
+      alert("刪除失敗");
+      console.error(e);
+    }
+  }
+</script>
+
+{% endblock %}
+

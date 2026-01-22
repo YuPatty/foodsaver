@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+/* 1. 移除按鈕區塊頂部線條 */
+#spotlight .card-wrap .card > .p-2 { 
+    border-top: none !important;
+}
+
+/* ===== 詳情/評價按鈕 (btn-outline-secondary) - 維持客製化灰色實心樣式 ===== */
+
+/* 2. 詳情/評價 - 預設樣式：淺米灰色背景 */
+#spotlight .card-wrap .card .btn-outline-secondary {
+    color: #212529 !important;               /* 文字強制為深黑 */
+    background-color: transparent !important;    /* 背景強制為淺灰色 (模擬您圖片中的預設色) */
+    border-color: #ced4da !important;        /* 邊框使用標準淺灰色 */
+    box-shadow: none !important;             /* 移除反光 */
+}
+
+/* 3. 詳情/評價 - Hover 樣式：實心深灰色 */
+#spotlight .card-wrap .card .btn-outline-secondary:hover,
+#spotlight .card-wrap .card .btn-outline-secondary:active {
+    color: #fff !important;                  /* Hover 文字變白 */
+    background-color: #6c757d !important;    /* Hover 背景強制為實心深灰色 */
+    border-color: #6c757d !important;        /* 邊框同步 */
+    box-shadow: none !important;             /* 移除 Hover/Active 時的反光 */
+}
+
+
+/* ===== 導航按鈕 (btn-outline-dark) - 回復為 Bootstrap 預設輪廓樣式 ===== */
+
+/* 4. 導航按鈕 - 預設樣式：透明背景、深黑邊框/文字 */
+#spotlight .card-wrap .card .btn-outline-dark {
+    background-color: transparent !important; /* 強制背景透明 */
+    color: #212529 !important;               /* 文字強制深黑 */
+    border-color: #212529 !important;        /* 邊框強制深黑 */
+    box-shadow: none !important;             /* 移除反光 */
+}
+
+/* 5. 導航按鈕 - Hover 樣式：實心深黑 */
+#spotlight .card-wrap .card .btn-outline-dark:hover {
+    background-color: #212529 !important; /* 實心深黑 */
+    border-color: #212529 !important;     /* 邊框實心深黑 */
+    color: #fff !important;               /* 文字白色 */
+    box-shadow: none !important;
+}
+</style>
+
+<div class="card mb-3">
+  <div class="card-header">查詢位置</div>
+    <div class="card-body">
+      <div class="input-group">
+        <input type="text" id="addressInput" class="form-control" placeholder="輸入地標，例如：台北101"list="addressHistoryList">
+        <button class="btn btn-primary" type="button" onclick="getCoordinates()">開始定位</button>
+      </div>
+    <div id="result" class="mt-3"></div>
+    <datalist id="addressHistoryList"></datalist>
+  </div>
+</div>
+<!-- Spotlight：一次顯示 3 張，底下有分頁點 -->
+<div id="spotlight" class="mb-3">
+  <div class="spotlight-track"></div>
+  <div class="spotlight-dots"></div>
+</div>
+<!-- Spotlight -->
+<div id="spotlight" class="mb-3">
+  <div class="spotlight-track"></div>
+  <div class="spotlight-dots"></div>
+</div>
+
+<link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
+
+<!-- 推薦商品依據 Modal -->
+<div class="modal fade" id="recoModal" tabindex="-1" aria-labelledby="recoTitle" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="recoTitle">推薦商品依據</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="關閉"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3 reco-grid">
+          {% set CATS = ['飯糰手捲','飯類主食','麵類主食','三明治','沙拉','蔬果','湯品','袋裝小吃','麵包','甜點','飲品'] %}
+          {% for c in CATS %}
+          <div class="col-6 col-md-4">
+            <label class="w-100 position-relative">
+              <input type="checkbox" class="reco-check" name="cat" value="{{ c }}">
+              <span class="cat-pill">{{ c }}</span>
+            </label>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="recoConfirm" class="btn btn-primary">確認</button>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 控制列 -->
+<div class="d-flex align-items-center gap-2 mb-2">
+  <select id="brandSelect" class="form-select form-select-sm" style="width: 160px;">
+    <option value="">全部品牌</option>
+    <option value="7-11">7-11</option>
+    <option value="familymart">FamilyMart</option>
+    <option value="hilife">HiLife</option>
+    <option value="okmart">OKMart</option>
+  </select>
+  <button class="btn btn-sm btn-outline-secondary" id="changeLocBtn">變更位置</button>
+  <div class="input-group input-group-sm" style="width:220px;">
+    <span class="input-group-text">半徑</span>
+    <input type="number" id="radiusInputTop" class="form-control" value="{{ radius_km|default(3) }}" min="1" max="20">
+    <span class="input-group-text">km</span>
+    <button class="btn btn-primary btn-sm" id="applyRadiusBtn">套用</button>
+  </div>
+</div>
+
+<div class="mt-2 text-muted small">
+  圈圈大小 = 剩餘量；<span class="text-primary">有顏色</span>：有即時品、<span class="text-secondary">灰色</span>：目前無即時品。
+</div>
+
+<div class="row">
+  <div class="col-12">
+    <div id="map"
+         data-center-lat="{{ center_lat|default(25.033964) }}"
+         data-center-lng="{{ center_lng|default(121.564468) }}"
+         data-radius-km="{{ radius_km|default(3) }}"
+         data-logged-in="{{ 1 if is_logged_in else 0 }}"
+         data-autogeo="{{ 0 if show_reco_modal else 1 }}"
+         style="height:70vh;"></div>
+  </div>
+</div>
+
+<div class="mt-2 text-muted small">
+  圈圈大小 = 剩餘量；<span class="text-primary">有顏色</span>：有即時品、<span class="text-secondary">灰色</span>：目前無即時品。
+</div>
+
+<!-- 位置 Modal -->
+<div class="modal" tabindex="-1" id="locModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">選擇顯示位置</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2">
+          <label class="form-label">縣市</label>
+          <select id="countySel" class="form-select">
+            <option value="">（自動偵測或選擇）</option>
+            <option value="台北市">台北市</option>
+            <option value="新北市">新北市</option>
+            <option value="台中市">台中市</option>
+            <option value="台南市">台南市</option>
+            <option value="高雄市">高雄市</option>
+            <option value="雲林縣">雲林縣</option>
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">行政區 / 市鎮（選填）</label>
+          <select id="townSel" class="form-select">
+            <option value="">（可不選）</option>
+            <option value="斗六市">斗六市</option>
+            <option value="信義區">信義區</option>
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">道路（選填，例如：雲林路）</label>
+          <input id="roadInput" class="form-control" placeholder="目前無 geocoding，先以行政區中心定位">
+        </div>
+        <div class="mb-2">
+          <label class="form-label">範圍（公里）</label>
+          <input type="number" id="radiusInput" class="form-control" value="{{ radius_km|default(3) }}" min="1" max="20">
+        </div>
+        <div class="text-muted small">未授權定位時預設台北101（信義區）。</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="applySelect">套用</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 把 JS 放在最後，避免 DOM 還沒載入就執行 -->
+<script src="{{ url_for('static', filename='js/spotlight.js') }}"></script>
+<script src="{{ url_for('static', filename='js/map.js') }}"></script>
+
+<script>
+  /* 全域變數：從後端注入是否登入給 spotlight.js 使用 */
+  window.IS_AUTH_SPOTLIGHT = "{{ 1 if is_logged_in else 0 }}" === "1";
+  
+  /* 加入喜愛 - 複製自 recommend.html */
+  async function addFav(pid){
+    const fd = new FormData(); fd.append('product_id', pid);
+    const r = await fetch('/api/favorites/add', {method:'POST', body: fd});
+    if (r.ok) {
+      // 假設您有 toast 函式
+      toast('已加入喜愛', 'success');
+      //alert('已加入喜愛');
+    } else {
+      toast('加入失敗，請稍後再試', 'danger');
+      //alert('加入失敗，請稍後再試');
+    }
+  }
+  
+  /* 帶確認的加入喜愛 - 複製自 recommend.html */
+  async function addFavWithConfirm(pid){
+    // 假設您有 confirmBox 函式，否則這裡使用標準 confirm
+    if (await confirmBox('加入喜愛', '確定要加入喜愛嗎？', '加入', '取消')) {
+    //if (confirm('確定要加入喜愛嗎？')) {
+      await addFav(pid);
+    }
+  }
+</script>
+
+
+{% endblock %}

@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}店家資訊{% endblock %}
+{% block content %}
+<div class="container-fluid py-2">
+
+  <!-- 店家標題 + 只保留一顆「導航至店家」按鈕 -->
+  <div class="d-flex align-items-start justify-content-between mb-3">
+    <div>
+      <h3 class="mb-1">{{ store.name }}</h3>
+      <p class="text-muted mb-0">{{ store.address }}</p>
+    </div>
+    <form action="{{ url_for('go_store', store_id=store.id) }}"
+          method="get"
+          target="_blank"
+          class="d-inline">
+      <button type="submit" class="btn btn-primary nav-go-store">
+        導航至店家
+      </button>
+    </form>
+  </div>
+
+  <!-- 商品卡片：多欄自適應 -->
+  <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3">
+    {% for p in products %}
+      <div class="col">
+        <div class="card h-100 shadow-sm">
+
+          {% if p.image_url %}
+          <img src="{{ p.image_url }}"
+               class="card-img-top"
+               alt="{{ p.name }}"
+               loading="lazy"
+               style="height:180px; object-fit:cover;">
+          {% endif %}
+
+          <div class="card-body d-flex flex-column">
+            <h6 class="card-title mb-1">{{ p.name }}</h6>
+
+            <!-- 價格 + 剩餘數量（放在卡片內） -->
+            <div class="d-flex align-items-center gap-2 mb-2">
+              {% if p.discount_rate is defined and p.discount_rate < 1 %}
+                <span class="badge bg-danger">{{ (p.discount_rate*10)|round(1) }} 折</span>
+                <span class="text-muted text-decoration-line-through">原價 ${{ '%.0f'|format(p.price) }}</span>
+                <strong class="ms-1">
+                  特價 ${{ '%.0f'|format(p.final_price if p.final_price is defined else (p.price * p.discount_rate)) }}
+                </strong>
+                {% if p.discount_end is defined and p.discount_end %}
+                  <span class="small text-muted ms-2">至 {{ p.discount_end }}</span>
+                {% endif %}
+              {% else %}
+                <strong>價格 ${{ '%.0f'|format(p.price) }}</strong>
+              {% endif %}
+
+              <span class="badge text-bg-success ms-2">剩餘 {{ p.remaining_qty|default(0) }}</span>
+            </div>
+
+            <!-- （可選）評分展示
+            {% if p.avg_rating is defined %}
+              <div class="mb-2 small">
+                <span class="text-warning">
+                  {% for i in range((p.avg_rating|int)) %}★{% endfor %}
+                  {% for i in range(5-(p.avg_rating|int)) %}☆{% endfor %}
+                </span>
+                <span class="text-muted ms-1">{{ (p.avg_rating or 0)|round(1) }}/5（{{ p.rating_count or 0 }}）</span>
+              </div>
+            {% endif %}
+            -->
+
+            <div class="mt-auto d-flex gap-2">
+              <!-- 若你的詳情頁 endpoint 名稱不同，改這裡 -->
+              <a class="btn btn-outline-secondary btn-sm w-50" href="{{ url_for('product_page', pid=p.id) }}">評價</a>
+
+              <!-- 喜愛清單（若你的路由不同請改） -->
+              <button class="btn btn-primary btn-sm w-50" onclick="addFav('{{ p.id }}')">加入喜愛</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% else %}
+      <div class="col">
+        <div class="alert alert-secondary">此店家暫無商品。</div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+<script>
+function addFav(pid){
+  pid = parseInt(pid, 10);
+  fetch("/api/favorites/add", {
+    method: "POST",
+    body: new URLSearchParams({ product_id: pid }),
+    credentials: "same-origin"
+  }).then(r => r.json()).then(j => {
+    if (j.ok) alert("已加入喜愛！");
+    else alert("加入失敗");
+  });
+}
+
+</script>
+
+{% endblock %}

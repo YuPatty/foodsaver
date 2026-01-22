@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}商品評價{% endblock %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-md-5">
+    <div class="card">
+      <img src="{{ product.image_url }}" class="card-img-top" alt="{{ product.name }}">
+      <div class="card-body">
+        <h5 class="card-title mb-1">{{ product.name }}</h5>
+        <div class="text-muted small mb-2">{{ product.store_name }}</div>
+        {% set avgv = avg.avg or 0 %}
+        <div class="mb-2">
+          <span class="text-warning">{% for i in range(avgv|int) %}★{% endfor %}{% for i in range(5-(avgv|int)) %}☆{% endfor %}</span>
+          <span class="ms-1">{{ (avgv)|round(1) }}/5（{{ avg.cnt or 0 }} 則）</span>
+        </div>
+        <a href="{{ url_for('store_page', store_id=product.store_id) }}" class="btn btn-outline-secondary btn-sm">回店家頁</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-7">
+    <div class="card p-3">
+      <h5 class="mb-3">撰寫評論</h5>
+      <form method="post">
+        <div class="mb-2">
+          <label class="form-label">評分</label>
+          <select class="form-select" name="rating" required>
+            <option value="5">★★★★★ (5)</option>
+            <option value="4">★★★★☆ (4)</option>
+            <option value="3">★★★☆☆ (3)</option>
+            <option value="2">★★☆☆☆ (2)</option>
+            <option value="1">★☆☆☆☆ (1)</option>
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">評論</label>
+          <textarea name="comment" class="form-control" rows="3" placeholder="想說的都可以寫這裡（可留白）"></textarea>
+        </div>
+        <button class="btn btn-primary">送出評論</button>
+      </form>
+    </div>
+    <div class="card mt-3">
+      <div class="card-body">
+        <h5 class="mb-3">最新評論</h5>
+        {% for r in reviews %}
+          <div class="mb-3">
+            <div class="d-flex align-items-center">
+              <strong>{{ r.username }}</strong>
+              <span class="ms-2 text-warning">{% for i in range(r.rating) %}★{% endfor %}{% for i in range(5-r.rating) %}☆{% endfor %}</span>
+              <span class="ms-auto text-muted small">{{ r.created_at }}</span>
+            </div>
+            {% if r.comment %}<div class="mt-1">{{ r.comment }}</div>{% endif %}
+          </div>
+          {% if not loop.last %}<hr>{% endif %}
+        {% else %}
+          <div class="text-muted">還沒有評論。</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
