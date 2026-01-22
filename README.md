@@ -58,7 +58,7 @@
 | **AI 技術** | **OpenAI SDK, OpenRouter.ai (LLaMA)** | 串接 OpenRouter 平台的 LLaMA 模型 API，實現 AI 智慧助理對話功能。 |
 ---
 
-## 🚀 安裝與執行 (Installation)
+##  安裝與執行
 
 1. **Clone 專案**
    ```bash
