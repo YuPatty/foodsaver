@@ -34,25 +34,6 @@
 
 ---
 
-##  開發技術
-
-本專案使用 Python 開發，環境為 Visual Studio Code，並採用輕量化的架構以便於部署。
-
-```python
-# Backend & Framework
-Framework = "Flask (Python)"
-Database  = "SQLite"
-
-# Frontend & Interaction
-Frontend  = ["HTML", "JavaScript"]
-Maps      = ["OpenStreetMap (Nominatim)", "Google Map API"]
-
-# AI Integration
-AI_Model  = "LLaMA (via OpenRouter.ai)"
-SDK       = "OpenAI Python SDK"
-'''
----
-
 ##  系統流程
 
 ### 1. 訪客模式
@@ -60,3 +41,37 @@ SDK       = "OpenAI Python SDK"
 
 ### 2.  會員模式
 享有「喜好清單」功能，系統主動推薦折扣商品並發送即時通知。
+
+---
+
+##  開發技術
+
+本系統使用 Python 開發，工具環境為 Visual Studio Code (VSCode)。詳細技術架構如下表：
+
+| 類別 | 技術/工具 | 說明與用途|
+| :--- | :--- | :--- |
+| **開發語言** | **Python** | 系統主要開發語言。 |
+| **後端框架** | **Flask** | 建立輕量快速、易於部署的網站後端架構。 |
+| **前端技術** | **HTML, JavaScript** | 建構互動式使用者介面，整合地圖 API。 |
+| **地圖服務** | **Nominatim, OpenStreetMap, Google Map** | 支援地標轉座標 (Geocoding)、地圖顯示及路徑導航。 |
+| **資料庫** | **SQLite** | 儲存商品資訊、使用者喜好清單、歷史紀錄與模擬資料。 |
+| **AI 技術** | **OpenAI SDK, OpenRouter.ai (LLaMA)** | 串接 OpenRouter 平台的 LLaMA 模型 API，實現 AI 智慧助理對話功能。 |
+---
+
+## 🚀 安裝與執行 (Installation)
+
+1. **Clone 專案**
+   ```bash
+   git clone [https://github.com/YuPatty/foodsaver.git]
+   (https://github.com/YuPatty/foodsaver.git)
+
+2. **安裝相依套件**
+    ```bash
+    pip install -r requirements.txt
+
+3. **啟動 Flask 伺服器**
+    ```bash
+    python app.py
+
+4. **開啟瀏覽器**
+---
