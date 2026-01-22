@@ -1,0 +1,35 @@
+body { background: #f9fafb; }
+#map { border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+/*.card img { object-fit: cover; height: 180px; }*/
+
+.card img { object-fit: cover; height: 180px; image-rendering: auto; }
+/* 左側側欄 */
+.sidebar a.text-decoration-none:hover .text-muted {
+  text-decoration: underline;
+}
+
+.sidebar{
+  background:#f3efe9;               /* 淺咖背景 */
+  min-height: 100vh;
+  border-right: 1px solid #e5ded3;
+}
+.sidebar .avatar{
+  width:48px; height:48px; font-size:22px;
+}
+.sidebar .brand{
+  color:#6b4d2f; border-bottom:3px solid #6b4d2f; display:inline-block; padding-bottom:4px;
+}
+.sidebar .nav-link{
+  color:#6b4d2f; border-left:4px solid transparent; border-radius:8px; padding:.5rem .75rem;
+}
+.sidebar .nav-link.active,
+.sidebar .nav-link:hover{
+  background:#fff; border-left-color:#6b4d2f; text-decoration:none; color:#6b4d2f;
+}
+
+/* 頁面大標題 */
+.page-title{
+  font-size:40px; font-weight:800; color:#6b4d2f;
+  border-bottom:4px solid #6b4d2f; display:inline-block; padding:6px 24px; border-radius:12px;
+  background:#fff; box-shadow:0 2px 8px rgba(0,0,0,.04);
+}

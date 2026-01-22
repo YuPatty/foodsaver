@@ -1,0 +1,87 @@
+:root{
+  --bg-cream:#f7f1e6;
+  --tile:#d9d0c2;
+  --tile-active:#bcae9a;
+  --text-dark:#3c372e;
+  --accent:#7a6d57;
+  --muted:#a69b8a;
+}
+
+/* Spotlight */
+
+/* 地圖容器美化 */
+#map{
+  border-radius:14px;
+  box-shadow:0 4px 22px rgba(0,0,0,.08);
+  border:1px solid #eee9df;
+  background:#fff;
+}
+
+/* 推薦商品依據 Modal */
+#recoModal .modal-content{
+  background:var(--bg-cream);
+  border:0;
+  border-radius:16px;
+  box-shadow:0 10px 30px rgba(0,0,0,.08);
+}
+#recoModal .modal-header{
+  border:0;
+  padding-bottom:0;
+}
+#recoModal .modal-title{
+  font-weight:800; color:var(--text-dark);
+  border-bottom:3px solid var(--accent);
+  display:inline-block; padding-bottom:.25rem;
+}
+
+/* 類別膠囊 */
+.reco-grid label{ display:block; }
+.reco-check{
+  position:absolute; opacity:0; pointer-events:none;
+}
+.cat-pill{
+  display:flex; align-items:center; justify-content:center;
+  width:100%;
+  padding:14px 12px;
+  border-radius:14px;
+  background:var(--tile);
+  color:var(--text-dark);
+  font-weight:700;
+  letter-spacing:.5px;
+  border:1px solid transparent;
+  transition:.2s ease;
+  box-shadow:0 1px 0 rgba(0,0,0,.02) inset;
+}
+.reco-check:focus + .cat-pill{ outline:2px solid #bfb6a7; }
+.reco-check:checked + .cat-pill{
+  background:var(--accent);
+  color:#fff;
+  transform:translateY(-1px);
+  box-shadow:0 8px 18px rgba(122,109,87,.25);
+}
+.avatar-marker {
+    width: 35px;
+    height: 35px;
+    font-size: 1.5rem;
+    color: #495057;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+.custom-div-icon {
+    background: transparent !important;
+    border: none !important;
+}
+
+.leaflet-div-icon {
+    background: transparent;
+    border: none;
+}
+
+/* 控制列微調 */
+#brandSelect, #radiusInputTop{ background:#fffdf9; }
+.input-group-text{ background:#f4efe6; border-color:#eadfcd; }
+.btn-outline-secondary{ border-color:#d9cfbd; color:#6d6456; }
+.btn-outline-secondary:hover{ background:#efe9de; }
+
+.text-muted{ color:#8b877f !important; }
+.small.note{ color:var(--muted); }
